@@ -13,13 +13,13 @@ Design:
 - Explicit, synchronous
 """
 
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 from dataclasses import dataclass
 import inspect
 import traceback
 
 from chronicon.workflow import Workflow
-from chronicon.step import Step, StepInvocation, StepKind, llm_call
+from chronicon.step import Step, StepInvocation, StepKind
 from chronicon.log import ExecutionLog
 from chronicon.serialization import is_serializable
 
@@ -79,6 +79,8 @@ def execute(
     workflow: Workflow,
     *args,
     log: Optional[ExecutionLog] = None,
+    llm_call: Optional[Callable] = None,
+    providers: Optional[dict[str, Callable]] = None,
     **kwargs,
 ) -> ExecutionResult:
     """
@@ -90,6 +92,9 @@ def execute(
         workflow: Workflow to execute
         *args: Positional arguments to workflow
         log: Execution log (creates default if None)
+        llm_call: Optional single llm_call function (for simple cases)
+        providers: Optional dict of named provider functions {"anthropic": fn, "ollama": fn}
+                  Allows workflows to use different providers per call
         **kwargs: Keyword arguments to workflow
         
     Returns:
@@ -132,8 +137,22 @@ def execute(
     _current_execution = ctx
     
     try:
-        # Get the current llm_call implementation (may be patched by user)
-        import chronicon.step
+        # Set up provider resolution
+        provider_registry = {}
+        default_provider = None
+        
+        if providers:
+            # Multiple providers: use the registry
+            provider_registry = providers
+            default_provider = providers.get("default") or next(iter(providers.values()))
+        elif llm_call:
+            # Single provider: use as default
+            default_provider = llm_call
+        else:
+            # No providers: use built-in chronicon.step.llm_call
+            import sys
+            step_module = sys.modules['chronicon.step']
+            default_provider = step_module.llm_call
         
         def logged_llm_call(
             prompt: str,
@@ -141,10 +160,22 @@ def execute(
             temperature: float = 1.0,
             max_tokens: int = 4096,
             system: Optional[str] = None,
+            provider: Optional[str] = None,
         ) -> str:
             """LLM call with logging."""
-            # Call the actual LLM (uses whatever is in chronicon.step.llm_call)
-            response = chronicon.step.llm_call(
+            # Resolve which provider to use
+            if provider and provider in provider_registry:
+                actual_llm_call = provider_registry[provider]
+            elif provider:
+                raise ValueError(
+                    f"Unknown provider '{provider}'. "
+                    f"Available: {list(provider_registry.keys())}"
+                )
+            else:
+                actual_llm_call = default_provider
+            
+            # Call the actual LLM
+            response = actual_llm_call(
                 prompt=prompt,
                 model=model,
                 temperature=temperature,
@@ -163,6 +194,7 @@ def execute(
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                     "system": system,
+                    "provider": provider,  # Track which provider was used
                 },
                 output=response,
                 llm_model=model,
@@ -176,7 +208,18 @@ def execute(
             
             return response
         
-        # Replace in workflow's globals if it imported llm_call
+        # Replace llm_call globally so workflows can import it
+        import sys
+        step_module = sys.modules['chronicon.step']
+        chronicon_module = sys.modules['chronicon']
+        
+        original_step_llm_call = step_module.llm_call
+        original_chronicon_llm_call = chronicon_module.llm_call
+        
+        step_module.llm_call = logged_llm_call
+        chronicon_module.llm_call = logged_llm_call
+        
+        # Also replace in workflow's globals if it was imported early
         workflow_globals = workflow.func.__globals__
         original_workflow_llm_call = None
         if 'llm_call' in workflow_globals:
@@ -206,7 +249,10 @@ def execute(
             )
             
         finally:
-            # Restore original llm_call in workflow globals
+            # Restore original llm_call
+            step_module.llm_call = original_step_llm_call
+            chronicon_module.llm_call = original_chronicon_llm_call
+            
             if original_workflow_llm_call is not None:
                 workflow_globals['llm_call'] = original_workflow_llm_call
     

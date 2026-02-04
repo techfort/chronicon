@@ -11,15 +11,8 @@ Prerequisites:
 No API key needed - everything runs locally!
 """
 
-from chronicon import workflow, execute, replay
+from chronicon import workflow, execute, replay, ollama_llm_call
 from chronicon.log import ExecutionLog
-
-# Import Ollama's llm_call and replace the default globally
-import chronicon.step
-from chronicon.integrations.ollama import llm_call
-
-# Monkey-patch: Replace Anthropic's llm_call with Ollama's
-chronicon.step.llm_call = llm_call
 
 
 @workflow
@@ -30,6 +23,7 @@ def local_sentiment_analysis(text: str) -> dict:
     This workflow runs entirely on your machine - no API calls,
     no API keys, no cloud dependencies.
     """
+    from chronicon import llm_call
     
     # Use Ollama's llama2 model (or mistral, codellama, etc.)
     result = llm_call(
@@ -57,6 +51,9 @@ Text: {text}""",
 
 
 def main():
+    # Create Ollama llm_call
+    llm_call = ollama_llm_call()
+    
     print("\n" + "=" * 70)
     print("CHRONICON + OLLAMA: Local LLM Workflow")
     print("=" * 70)
@@ -78,6 +75,7 @@ def main():
             local_sentiment_analysis,
             text=text,
             log=log,
+            llm_call=llm_call,  # Pass Ollama llm_call explicitly
         )
         
         if result.success:

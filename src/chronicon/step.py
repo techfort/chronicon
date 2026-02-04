@@ -113,6 +113,7 @@ def llm_call(
     temperature: float = 1.0,
     max_tokens: int = 4096,
     system: Optional[str] = None,
+    provider: Optional[str] = None,
 ) -> str:
     """
     Make an LLM call (Anthropic Claude).
@@ -128,6 +129,7 @@ def llm_call(
         temperature: Sampling temperature (0-1)
         max_tokens: Maximum tokens in response
         system: Optional system prompt
+        provider: Optional provider name (when using multiple providers)
         
     Returns:
         The text response from the LLM
@@ -136,6 +138,8 @@ def llm_call(
         This function is NOT decorated as a step. It's called directly
         from workflows and the execution engine handles the logging.
         During replay, the logged response is returned without calling the API.
+        The provider parameter is only used when execute() is called with a
+        providers dict. It's ignored when using a single llm_call function.
     """
     import anthropic
     import os
