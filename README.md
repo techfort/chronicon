@@ -7,6 +7,24 @@ Chronicon is a workflow engine for building LLM applications that can be:
 - **Tested** against real past executions (no mocks)
 - **Debugged** with full visibility into every step
 
+## When to Use Chronicon
+
+**Use Chronicon when:**
+- ✅ Testing LLM applications against real past executions
+- ✅ Debugging complex LLM workflows by replaying them exactly
+- ✅ Building regression tests without mocking LLM responses
+- ✅ Developing locally with full execution visibility
+- ✅ You need deterministic replay of any workflow execution
+
+**Don't use Chronicon for:**
+- ❌ Production job orchestration (use Trigger.dev, Temporal, Celery)
+- ❌ Distributed systems or parallel execution
+- ❌ Cloud deployment or scaling
+- ❌ Real-time production workloads
+- ❌ General background jobs unrelated to LLMs
+
+**TL;DR:** Chronicon is a **development and testing tool** for LLM apps, not production infrastructure.
+
 ## What This Is NOT
 
 - ❌ An agent framework
