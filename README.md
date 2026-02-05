@@ -13,6 +13,7 @@ Chronicon is a workflow engine for building LLM applications that can be:
 - ❌ A prompt library
 - ❌ A distributed system
 - ❌ A flexible DSL
+- ❌ A model hosting service
 
 ## Core Principles
 
@@ -25,10 +26,12 @@ Chronicon is a workflow engine for building LLM applications that can be:
 ## Quick Start
 
 ```python
-from chronicon import workflow, step, llm_call
+from chronicon import workflow, execute, replay, anthropic_llm_call
 
 @workflow
 def summarize(url: str) -> tuple[str, int]:
+    from chronicon import llm_call
+    
     # Fetch text (effectful)
     text = fetch(url)
     
@@ -47,13 +50,49 @@ def summarize(url: str) -> tuple[str, int]:
     return summary, int(score)
 
 # Run it
-execution = summarize.run(url="https://example.com")
+llm_call = anthropic_llm_call()
+result = execute(summarize, url="https://example.com", llm_call=llm_call)
 
 # Replay it exactly
-execution = summarize.replay(execution_id=execution.id)
+result = replay(execution_id=result.execution_id)
 
 # Test against past execution
-assert summarize.replay(execution_id="abc123").output == expected_output
+assert replay(execution_id="abc123").output == expected_output
+```
+
+### Multi-Provider Support
+
+Use different LLM providers for different tasks in the same workflow:
+
+```python
+from chronicon import workflow, execute, anthropic_llm_call, ollama_llm_call
+
+@workflow
+def analyze(text: str) -> dict:
+    from chronicon import llm_call
+    
+    # Use local Ollama for fast classification
+    category = llm_call(
+        prompt=f"Classify: {text}",
+        model="llama2",
+        provider="ollama"  # Route to local model
+    )
+    
+    # Use Claude for detailed analysis
+    analysis = llm_call(
+        prompt=f"Analyze: {text}",
+        model="claude-3-5-sonnet-20241022",
+        provider="anthropic"  # Route to cloud API
+    )
+    
+    return {"category": category, "analysis": analysis}
+
+# Execute with multiple providers
+providers = {
+    "anthropic": anthropic_llm_call(),
+    "ollama": ollama_llm_call(),
+}
+result = execute(analyze, "sample text", providers=providers)
 ```
 
 ## Core Abstractions
@@ -92,6 +131,7 @@ Can:
 ## Documentation
 
 - **[Quick Start Guide](QUICKSTART.md)** - Get running in 5 minutes
+- **[LLM Providers](docs/PROVIDERS.md)** - Multi-provider configuration and usage
 - **[Project Structure](STRUCTURE.md)** - Architecture and design
 - **[Development Guide](DEVELOPMENT.md)** - Contributing and testing
 - **[Project Summary](PROJECT_SUMMARY.md)** - Complete implementation details
@@ -132,12 +172,12 @@ What's working:
 - ✅ Workflow definition and versioning
 - ✅ Execution logging (SQLite)
 - ✅ Deterministic replay
-- ✅ LLM call tracking (Anthropic)
+- ✅ Multiple LLM providers (Anthropic, OpenAI, Google, Ollama, custom)
+- ✅ Provider routing (different models per task)
 
 What's not (and won't be in v0):
 - ❌ Parallelism
 - ❌ Agents
-- ❌ Multiple LLM providers
 - ❌ Cloud deployment
 - ❌ UI
 
