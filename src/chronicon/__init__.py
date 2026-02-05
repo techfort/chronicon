@@ -14,6 +14,7 @@ from chronicon.providers import (
     ollama_llm_call,
     openai_llm_call,
     google_llm_call,
+    openrouter_llm_call,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "ollama_llm_call",
     "openai_llm_call",
     "google_llm_call",
+    "openrouter_llm_call",
 ]

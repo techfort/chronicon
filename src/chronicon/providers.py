@@ -56,6 +56,7 @@ def create_llm_call(
         "openai": "openai",
         "google": "gemini",
         "ollama": "ollama",
+        "openrouter": "openrouter",
         "custom": None,  # Handle custom separately
     }
     
@@ -169,3 +170,8 @@ def openai_llm_call(api_key: Optional[str] = None) -> Callable:
 def google_llm_call(api_key: Optional[str] = None) -> Callable:
     """Create Google AI Studio llm_call function."""
     return create_llm_call("google", api_key=api_key)
+
+
+def openrouter_llm_call(api_key: Optional[str] = None) -> Callable:
+    """Create OpenRouter llm_call function."""
+    return create_llm_call("openrouter", api_key=api_key)
