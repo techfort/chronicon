@@ -44,34 +44,51 @@ Chronicon is a workflow engine for building LLM applications that can be:
 ## Quick Start
 
 ```python
-from chronicon import workflow, execute, replay, anthropic_llm_call
+from chronicon import workflow, step, execute, replay, anthropic_llm_call
+
+# Effectful step: makes HTTP call, logged for replay
+@step
+def fetch(url: str) -> str:
+    import requests
+    return requests.get(url).text
+
+# Pure step: deterministic, still logged for tracing
+@step
+def extract_score(text: str) -> int:
+    # Extract first number from text
+    import re
+    match = re.search(r'\d+', text)
+    return int(match.group()) if match else 0
 
 @workflow
 def summarize(url: str) -> tuple[str, int]:
     from chronicon import llm_call
     
-    # Fetch text (effectful)
+    # Step 1: Fetch text (effectful, logged)
     text = fetch(url)
     
-    # LLM summarization (effectful, logged)
+    # Step 2: LLM summarization (effectful, logged)
     summary = llm_call(
         prompt=f"Summarize this text:\n\n{text}",
         model="claude-3-5-sonnet-20241022",
     )
     
-    # Score quality (effectful, logged)
-    score = llm_call(
+    # Step 3: Score quality (effectful, logged)
+    score_text = llm_call(
         prompt=f"Rate this summary 1-10:\n\n{summary}",
         model="claude-3-5-sonnet-20241022",
     )
     
-    return summary, int(score)
+    # Step 4: Parse score (pure, logged)
+    score = extract_score(score_text)
+    
+    return summary, score
 
 # Run it
 llm_call = anthropic_llm_call()
 result = execute(summarize, url="https://example.com", llm_call=llm_call)
 
-# Replay it exactly
+# Replay it exactly - all steps replayed from logs, no HTTP or LLM calls
 result = replay(execution_id=result.execution_id)
 
 # Test against past execution
